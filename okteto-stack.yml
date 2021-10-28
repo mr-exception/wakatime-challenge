@@ -5,7 +5,7 @@ services:
     ports:
       - 8080
     volumes:
-      - data:./data
+      - data:/data
 endpoints:
   - path: /
     service: node
