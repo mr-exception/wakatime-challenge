@@ -1,6 +1,6 @@
 services:
   node:
-    image:
+    build:
       context: .
       dockerfile: dockerfile
     ports:
