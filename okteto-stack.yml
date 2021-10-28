@@ -1,0 +1,9 @@
+services:
+  node:
+    image:
+      context: .
+      dockerfile: dockerfile
+    ports:
+      - 8080
+    # volumes:
+    #   - redis:/data
