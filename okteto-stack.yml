@@ -2,6 +2,5 @@ services:
   node:
     build:
       context: .
-      dockerfile: dockerfile
     ports:
       - 8080
