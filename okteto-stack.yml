@@ -5,7 +5,7 @@ services:
     ports:
       - 8080
     volumes:
-      - data:./data.sqlite
+      - data:./storage/data.sqlite
 volumes:
   data:
     driver_opts:
