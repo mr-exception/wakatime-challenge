@@ -5,7 +5,7 @@ const Telegraf = require("telegraf");
 const app = express();
 const port = 8080;
 
-const db = new sqlite.Database("./data.sqlite");
+const db = new sqlite.Database("./data/data.sqlite");
 
 db.serialize(() => {
   db.run(
