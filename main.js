@@ -112,6 +112,10 @@ async function updateRecords() {
         reject();
         return;
       }
+      if (users.length === 0) {
+        console.log("[update]: no user registered");
+        resolve();
+      }
       users.forEach(async (user) => {
         const records = await fetchSourceRecords(user.source);
         records.forEach(async (stat) => {
@@ -126,6 +130,7 @@ async function updateRecords() {
           }
         });
       });
+      resolve();
     });
   });
 }
@@ -162,6 +167,10 @@ async function sendWeeklyScores() {
           reject();
           return;
         }
+        if (rows.length === 0) {
+          console.log("[week]: no user registered");
+          resolve();
+        }
         const text = rows
           .map((row) => `${row.name} got ${row.score} points`)
           .join("\n");
@@ -170,7 +179,6 @@ async function sendWeeklyScores() {
         for (let i = 1; i < rows.length; i++) {
           if (winner.score < rows[i].score) winner = rows[i];
         }
-
         await sendMessage(
           `it's time for weekly reports!\n${text}\nwinner: ${winner.name}`,
           true
@@ -192,6 +200,10 @@ async function sendDailyScores() {
           reject();
           return;
         }
+        if (rows.length === 0) {
+          console.log("[daily]: no user registered");
+          resolve();
+        }
         const text = rows
           .map((row) => `${row.name} got ${row.score} points`)
           .join("\n");
@@ -202,15 +214,33 @@ async function sendDailyScores() {
   });
 }
 
-cron.schedule("* * * * *", async () => {
-  console.log("starting daily task");
-  await updateRecords();
-  console.log("updated records");
-  await sendDailyScores();
-  console.log("sent daily report");
-  setTimeout(() => {
-    sendWeeklyScores();
-    console.log("sent weekly report");
-  }, 10000);
-  console.log("finished task\n-------------------");
+// hourly update
+cron.schedule("0 * * * *", async () => {
+  try {
+    console.log("updating records");
+    await updateRecords();
+    console.log("updated records");
+  } catch (error) {
+    console.log(error);
+  }
+});
+// daily report
+cron.schedule("0 1 * * *", async () => {
+  try {
+    console.log("sending daily reports");
+    await sendDailyScores();
+    console.log("sent daily reports");
+  } catch (error) {
+    console.log(error);
+  }
+});
+// weekly reports
+cron.schedule("0 2 * * 5", async () => {
+  try {
+    console.log("sending weekly reports");
+    await sendWeeklyScores();
+    console.log("sent weekly reports");
+  } catch (error) {
+    console.log(error);
+  }
 });

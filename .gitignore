@@ -2,3 +2,4 @@
 /storage/data.sqlite
 .env
 package-lock.json
+okteto.exe

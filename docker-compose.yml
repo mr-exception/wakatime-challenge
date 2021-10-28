@@ -4,5 +4,8 @@ services:
     build:
       context: ./
       dockerfile: Dockerfile
+    environment:
+      TG_TOKEN: "2086572311:AAGaDqVvOd7sJugyrWow-BxB05h4R7YPnUM"
+      CHAT_ID: "-1001656244586"
     ports:
       - 8080:8080
