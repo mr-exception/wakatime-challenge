@@ -6,6 +6,9 @@ services:
       - 8080
     volumes:
       - data:./storage/data.sqlite
+    environment:
+      - TG_TOKEN=$TG_TOKEN
+      - CHAT_ID=$CHAT_ID
 volumes:
   data:
     driver_opts:
