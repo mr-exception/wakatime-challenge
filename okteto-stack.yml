@@ -5,5 +5,3 @@ services:
       dockerfile: dockerfile
     ports:
       - 8080
-    # volumes:
-    #   - redis:/data
