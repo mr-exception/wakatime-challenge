@@ -5,7 +5,10 @@ const Telegraf = require("telegraf");
 const app = express();
 const port = 8080;
 
-const db = new sqlite.Database("./data/data.sqlite");
+const db = new sqlite.Database("./data.sqlite");
+
+const TG_TOKEN = process.env.TG_TOKEN;
+const CHAT_ID = process.env.CHAT_ID;
 
 db.serialize(() => {
   db.run(
@@ -102,21 +105,19 @@ function updateRecords() {
 
 async function sendMessage(text, pin = false) {
   const result = (
-    await axios.post(
-      "https://api.telegram.org/bot2086572311:AAGaDqVvOd7sJugyrWow-BxB05h4R7YPnUM/sendMessage",
-      {
-        text,
-        chat_id: "-1001656244586",
-      }
-    )
+    await axios.post(`https://api.telegram.org/bot${TG_TOKEN}/sendMessage`, {
+      text,
+      chat_id: CHAT_ID,
+    })
   ).data;
   if (pin) {
     const message_id = result.result.message_id;
     await axios
-      .post(
-        "https://api.telegram.org/bot2086572311:AAGaDqVvOd7sJugyrWow-BxB05h4R7YPnUM/pinChatMessage",
-        { message_id, chat_id: "-1001656244586", disable_notification: true }
-      )
+      .post(`https://api.telegram.org/bot${TG_TOKEN}/pinChatMessage`, {
+        message_id,
+        chat_id: CHAT_ID,
+        disable_notification: true,
+      })
       .catch((error) => {
         console.log(error);
       });
