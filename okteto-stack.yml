@@ -9,10 +9,6 @@ services:
     environment:
       - TG_TOKEN=$TG_TOKEN
       - CHAT_ID=$CHAT_ID
-volumes:
-  data:
-    driver_opts:
-      size: 0.5Gi
 endpoints:
   - path: /
     service: node
