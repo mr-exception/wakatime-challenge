@@ -83,29 +83,52 @@ async function fetchSourceRecords(source) {
   }
 }
 
-function updateRecords() {
-  db.each(`select * from users`, async function (err, user) {
-    if (err) {
-      console.log("error in quering users");
-      return;
-    }
-    const records = await fetchSourceRecords(user.source);
-    records.forEach((stat) => {
-      db.get(
-        `select * from records where date = '${stat.date}' and user_id = '${user.ID}'`,
-        function (err, record) {
-          if (err) {
-            console.log("error in quering records");
-            return;
-          }
+async function dbGet(query) {
+  return new Promise((resolve, reject) => {
+    db.get(query, function (err, record) {
+      if (err) {
+        console.log("error in quering records");
+        reject();
+        return;
+      }
+      resolve(record);
+    });
+  });
+}
+async function dbRun(query) {
+  return new Promise((resolve, reject) => {
+    db.run(query, (err) => {
+      if (err) {
+        reject(err);
+      } else {
+        resolve();
+      }
+    });
+  });
+}
+
+async function updateRecords() {
+  return new Promise((resolve, reject) => {
+    db.all(`select * from users`, async function (err, users) {
+      if (err) {
+        console.log("error in quering users");
+        reject();
+        return;
+      }
+      users.forEach(async (user) => {
+        const records = await fetchSourceRecords(user.source);
+        records.forEach(async (stat) => {
+          const record = await dbGet(
+            `select * from records where date = '${stat.date}' and user_id = '${user.ID}'`
+          );
           if (!record) {
-            db.run(
+            await dbRun(
               `insert into records (user_id, score, date) values ('${user.ID}', ${stat.score}, '${stat.date}')`
             );
             console.log(`inserted new record for ${user.name} (${stat.date})`);
           }
-        }
-      );
+        });
+      });
     });
   });
 }
@@ -182,17 +205,15 @@ async function sendDailyScores() {
   });
 }
 
-// every 6 hours
-setInterval(() => {
-  updateRecords();
-}, 10000);
-// every 24 hours
-setInterval(async () => {
-  sendDailyScores();
-}, 20000);
-// every 7 days
-setInterval(() => {
+cron.schedule("* * * * *", async () => {
+  console.log("starting daily task");
+  await updateRecords();
+  console.log("updated records");
+  await sendDailyScores();
+  console.log("sent daily report");
   setTimeout(() => {
     sendWeeklyScores();
-  }, 5000);
-}, 30000);
+    console.log("sent weekly report");
+  }, 10000);
+  console.log("finished task\n-------------------");
+});
