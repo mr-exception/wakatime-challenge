@@ -2,6 +2,7 @@ const express = require("express");
 const sqlite = require("sqlite3");
 const axios = require("axios");
 const Telegraf = require("telegraf");
+const cron = require("node-cron");
 const fs = require("fs");
 const app = express();
 const port = 8080;
@@ -12,7 +13,9 @@ if (!fs.existsSync("./storage")) {
 const db = new sqlite.Database("./storage/data.sqlite");
 
 const TG_TOKEN = process.env.TG_TOKEN;
+console.log(`telegram token: ${TG_TOKEN}`);
 const CHAT_ID = process.env.CHAT_ID;
+console.log(`target chat id: ${CHAT_ID}`);
 
 db.serialize(() => {
   db.run(
@@ -129,46 +132,54 @@ async function sendMessage(text, pin = false) {
 }
 
 async function sendWeeklyScores() {
-  const offsetDate = Math.floor(Date.now() / 1000) - 7 * 24 * 3600;
-  db.all(
-    `select user_id, name, sum(score) as score from records INNER JOIN users on users.ID = records.user_id where date > ${offsetDate} group by user_id`,
-    async function (err, rows) {
-      if (err) {
-        console.log("error in quering records");
-        return;
-      }
-      const text = rows
-        .map((row) => `${row.name} got ${row.score} points`)
-        .join("\n");
+  return new Promise((resolve, reject) => {
+    const offsetDate = Math.floor(Date.now() / 1000) - 7 * 24 * 3600;
+    db.all(
+      `select user_id, name, sum(score) as score from records INNER JOIN users on users.ID = records.user_id where date > ${offsetDate} group by user_id`,
+      async function (err, rows) {
+        if (err) {
+          console.log("error in quering records");
+          reject();
+          return;
+        }
+        const text = rows
+          .map((row) => `${row.name} got ${row.score} points`)
+          .join("\n");
 
-      let winner = rows[0];
-      for (let i = 1; i < rows.length; i++) {
-        if (winner.score < rows[i].score) winner = rows[i];
-      }
+        let winner = rows[0];
+        for (let i = 1; i < rows.length; i++) {
+          if (winner.score < rows[i].score) winner = rows[i];
+        }
 
-      await sendMessage(
-        `it's time for weekly reports!\n${text}\nwinner: ${winner.name}`,
-        true
-      );
-    }
-  );
+        await sendMessage(
+          `it's time for weekly reports!\n${text}\nwinner: ${winner.name}`,
+          true
+        );
+        resolve();
+      }
+    );
+  });
 }
 
 async function sendDailyScores() {
-  const offsetDate = Math.floor(Date.now() / 1000) - 24 * 3600;
-  db.all(
-    `select user_id, name, sum(score) as score from records INNER JOIN users on users.ID = records.user_id where date > ${offsetDate} group by user_id`,
-    async function (err, rows) {
-      if (err) {
-        console.log("error in quering records");
-        return;
+  return new Promise((resolve, reject) => {
+    const offsetDate = Math.floor(Date.now() / 1000) - 24 * 3600;
+    db.all(
+      `select user_id, name, sum(score) as score from records INNER JOIN users on users.ID = records.user_id where date > ${offsetDate} group by user_id`,
+      async function (err, rows) {
+        if (err) {
+          console.log("error in quering records");
+          reject();
+          return;
+        }
+        const text = rows
+          .map((row) => `${row.name} got ${row.score} points`)
+          .join("\n");
+        await sendMessage("what happened yesterday?\n" + text);
+        resolve();
       }
-      const text = rows
-        .map((row) => `${row.name} got ${row.score} points`)
-        .join("\n");
-      await sendMessage("what happened yesterday?\n" + text);
-    }
-  );
+    );
+  });
 }
 
 // every 6 hours
