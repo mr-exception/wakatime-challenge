@@ -158,7 +158,8 @@ async function sendMessage(text, pin = false) {
 
 async function sendWeeklyScores() {
   return new Promise((resolve, reject) => {
-    const offsetDate = Math.floor(Date.now() / 1000) - 7 * 24 * 3600;
+    const offsetDate =
+      Math.floor(Date.now() / 1000) - 7 * 24 * 3600 + 12 * 3600;
     db.all(
       `select user_id, name, sum(score) as score from records INNER JOIN users on users.ID = records.user_id where date > ${offsetDate} group by user_id`,
       async function (err, rows) {
