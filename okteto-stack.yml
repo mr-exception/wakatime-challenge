@@ -6,6 +6,10 @@ services:
       - 8080
     volumes:
       - data:/data
+volumes:
+  data:
+    driver_opts:
+      size: 0.5Gi
 endpoints:
   - path: /
     service: node
