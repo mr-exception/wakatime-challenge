@@ -23,6 +23,14 @@ db.serialize(() => {
   );
 });
 
+app.get("/", (req, res) => {
+  res.send({
+    ok: true,
+    name: "wakatime challenge bot",
+    time: new Date(),
+  });
+});
+
 app.get("/register", (req, res) => {
   const { name, source, private_token } = req.query;
   db.get(
