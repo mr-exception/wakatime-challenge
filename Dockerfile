@@ -4,7 +4,7 @@ WORKDIR /usr/src/app
 
 COPY . /usr/src/app
 
-RUN rm -r node_modules package-lock.json
+RUN rm -r -f node_modules package-lock.json
 
 RUN npm i
 
