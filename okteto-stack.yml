@@ -7,8 +7,6 @@ services:
     environment:
       - TG_TOKEN=$TG_TOKEN
       - CHAT_ID=$CHAT_ID
-    volumes:
-      - ./data
 endpoints:
   - path: /
     service: node
