@@ -124,7 +124,8 @@ async function updateRecords() {
         console.log("[update]: no user registered");
         resolve();
       }
-      users.forEach(async (user) => {
+      for (let i = 0; i < users.length; i++) {
+        const user = users[i];
         const records = await fetchSourceRecords(user.source);
         records.forEach(async (stat) => {
           const record = await dbGet(
@@ -137,7 +138,7 @@ async function updateRecords() {
             console.log(`inserted new record for ${user.name} (${stat.date})`);
           }
         });
-      });
+      }
       resolve();
     });
   });
@@ -166,8 +167,7 @@ async function sendMessage(text, pin = false) {
 
 async function sendWeeklyScores() {
   return new Promise((resolve, reject) => {
-    const offsetDate =
-      Math.floor(Date.now() / 1000) - 7 * 24 * 3600 + 12 * 3600;
+    const offsetDate = Math.floor(Date.now()) - 7 * 24 * 3600 + 12 * 3600;
     db.all(
       `select user_id, name, sum(score) as score from records INNER JOIN users on users.ID = records.user_id where date > ${offsetDate} group by user_id`,
       async function (err, rows) {
@@ -179,6 +179,7 @@ async function sendWeeklyScores() {
         if (rows.length === 0) {
           console.log("[week]: no user registered");
           resolve();
+          return;
         }
         const text = rows
           .map((row) => `${row.name} got ${row.score} points`)
@@ -189,8 +190,7 @@ async function sendWeeklyScores() {
           if (winner.score < rows[i].score) winner = rows[i];
         }
         await sendMessage(
-          `it's time for weekly reports!\n${text}\nwinner: ${winner.name}`,
-          true
+          `it's time for weekly reports!\n${text}\nwinner: ${winner.name}`
         );
         resolve();
       }
@@ -200,7 +200,7 @@ async function sendWeeklyScores() {
 
 async function sendDailyScores() {
   return new Promise((resolve, reject) => {
-    const offsetDate = Math.floor(Date.now() / 1000) - 24 * 3600;
+    const offsetDate = Math.floor(Date.now()) - 24 * 3600 * 1000;
     db.all(
       `select user_id, name, sum(score) as score from records INNER JOIN users on users.ID = records.user_id where date > ${offsetDate} group by user_id`,
       async function (err, rows) {
@@ -234,7 +234,7 @@ cron.schedule("0 * * * *", async () => {
   }
 });
 // daily report
-cron.schedule("0 1 * * *", async () => {
+cron.schedule("30 0 * * *", async () => {
   try {
     console.log("sending daily reports");
     await sendDailyScores();
