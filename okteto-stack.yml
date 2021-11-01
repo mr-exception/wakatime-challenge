@@ -13,5 +13,5 @@ endpoints:
   - path: /
     service: node
     port: 8080
-volume:
+volumes:
   - data
