@@ -1,27 +1,62 @@
 const express = require("express");
-const sqlite = require("sqlite3");
 const axios = require("axios");
-const Telegraf = require("telegraf");
 const cron = require("node-cron");
 const fs = require("fs");
 const app = express();
 const port = 8080;
-
-const db = new sqlite.Database("./data/data.sqlite");
 
 const TG_TOKEN = process.env.TG_TOKEN;
 console.log(`telegram token: ${TG_TOKEN}`);
 const CHAT_ID = process.env.CHAT_ID;
 console.log(`target chat id: ${CHAT_ID}`);
 
-db.serialize(() => {
-  db.run(
-    `CREATE TABLE IF NOT EXISTS "users" (ID integer primary key, name varchar(20), source text , token TEXT)`
-  );
-  db.run(
-    `CREATE TABLE IF NOT EXISTS "records" (ID integer primary key, user_id varchar(20), score text , date integer)`
-  );
-});
+let data = [];
+
+function getUser(token) {
+  return data.find((record) => record.token === token);
+}
+function createUser(name, token, link) {
+  const user = getUser(token);
+  if (user) {
+    user.name = name;
+    user.link = link;
+    return false;
+  } else {
+    data.push({ name, token, link, records: [] });
+    return true;
+  }
+}
+function addRecords(token, records) {
+  data = data.map((user) => {
+    if (user.token !== token) return user;
+    records.forEach((record) => {
+      if (!user.records.find((r) => r.date === record.date)) {
+        console.log(
+          `[new] ${user.name}, score: ${record.score}, date: ${record.date}`
+        );
+        user.records.push(record);
+      }
+    });
+    user.records = user.records.filter(
+      (r) => r.date > Date.now() - 24 * 7 * 3600 * 1000
+    );
+    return user;
+  });
+}
+function getYesterdayRecord(token) {
+  const user = data.find((r) => r.token === token);
+  if (!user) return undefined;
+  return user.records.find((r) => r.date > Date.now() - 24 * 3600 * 1000);
+}
+
+function getWeekScore(token) {
+  const user = data.find((r) => r.token === token);
+  let result = 0;
+  user.records.forEach((r) => {
+    result += r.score;
+  });
+  return result;
+}
 
 app.get("/", (req, res) => {
   res.send({
@@ -33,41 +68,24 @@ app.get("/", (req, res) => {
 
 app.get("/register", (req, res) => {
   const { name, source, private_token } = req.query;
-  db.get(
-    `select id from users where token = '${private_token}'`,
-    function (err, row) {
-      if (err) {
-        res.send({
-          ok: false,
-          message: "internal error",
-        });
-        return;
-      }
-      if (row) {
-        db.run(
-          `update users set source = '${source}', name = '${name}' where token = '${private_token}'`
-        );
-        console.log(`${name} updated source url`);
-        res.send({
-          ok: true,
-          message: `Hi ${name}! thanks for updating your source url`,
-        });
-      } else {
-        db.run(
-          `insert into users (name, source, token) values ('${name}', '${source}', '${private_token}')`
-        );
-        console.log(`${name} registered source url`);
-        res.send({
-          ok: true,
-          message: `Hi ${name}! thanks for registering your source url`,
-        });
-      }
-    }
-  );
+  const result = createUser(name, private_token, source);
+  if (!result) {
+    console.log(`updated ${name} link`);
+    res.send({
+      ok: true,
+      message: `Hi ${name}! thanks for updating your source url`,
+    });
+  } else {
+    console.log(`registered ${name} link`);
+    res.send({
+      ok: true,
+      message: `Hi ${name}! thanks for registering your source url`,
+    });
+  }
 });
 
 app.listen(port, () => {
-  console.log(`app listening at http://localhost:${port}`);
+  console.log(`listening at port ${port}`);
 });
 
 // record fetch
@@ -80,7 +98,6 @@ async function fetchSourceRecords(source) {
         const date = new Date(record.range.end);
         const score =
           record.grand_total.hours * 60 + record.grand_total.minutes;
-        // const date = record.range.date;
         return { score, date: date.getTime() };
       });
   } catch (error) {
@@ -88,60 +105,16 @@ async function fetchSourceRecords(source) {
   }
 }
 
-async function dbGet(query) {
-  return new Promise((resolve, reject) => {
-    db.get(query, function (err, record) {
-      if (err) {
-        console.log("error in quering records");
-        reject();
-        return;
-      }
-      resolve(record);
-    });
-  });
-}
-async function dbRun(query) {
-  return new Promise((resolve, reject) => {
-    db.run(query, (err) => {
-      if (err) {
-        reject(err);
-      } else {
-        resolve();
-      }
-    });
-  });
-}
-
 async function updateRecords() {
-  return new Promise((resolve, reject) => {
-    db.all(`select * from users`, async function (err, users) {
-      if (err) {
-        console.log("error in quering users");
-        reject();
-        return;
-      }
-      if (users.length === 0) {
-        console.log("[update]: no user registered");
-        resolve();
-      }
-      for (let i = 0; i < users.length; i++) {
-        const user = users[i];
-        const records = await fetchSourceRecords(user.source);
-        records.forEach(async (stat) => {
-          const record = await dbGet(
-            `select * from records where date = '${stat.date}' and user_id = '${user.ID}'`
-          );
-          if (!record) {
-            await dbRun(
-              `insert into records (user_id, score, date) values ('${user.ID}', ${stat.score}, '${stat.date}')`
-            );
-            console.log(`inserted new record for ${user.name} (${stat.date})`);
-          }
-        });
-      }
-      resolve();
-    });
-  });
+  try {
+    for (let i = 0; i < data.length; i++) {
+      const user = data[i];
+      const records = await fetchSourceRecords(user.link);
+      addRecords(user.token, records);
+    }
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 async function sendMessage(text, pin = false) {
@@ -166,63 +139,54 @@ async function sendMessage(text, pin = false) {
 }
 
 async function sendWeeklyScores() {
-  return new Promise((resolve, reject) => {
-    const offsetDate = Math.floor(Date.now()) - 7 * 24 * 3600 + 12 * 3600;
-    db.all(
-      `select user_id, name, sum(score) as score from records INNER JOIN users on users.ID = records.user_id where date > ${offsetDate} group by user_id`,
-      async function (err, rows) {
-        if (err) {
-          console.log("error in quering records");
-          reject();
-          return;
+  try {
+    let winner = undefined;
+    const text = data
+      .map((user) => {
+        const score = getWeekScore(user.token);
+        if (!score) return undefined;
+        if (!winner || winner.score < score) {
+          winner = { name: user.name, score };
         }
-        if (rows.length === 0) {
-          console.log("[week]: no user registered");
-          resolve();
-          return;
-        }
-        const text = rows
-          .map((row) => `${row.name} got ${row.score} points`)
-          .join("\n");
-
-        let winner = rows[0];
-        for (let i = 1; i < rows.length; i++) {
-          if (winner.score < rows[i].score) winner = rows[i];
-        }
-        await sendMessage(
-          `it's time for weekly reports!\n${text}\nwinner: ${winner.name}`
-        );
-        resolve();
-      }
+        return `${user.name}: ${score}`;
+      })
+      .filter((r) => !!r)
+      .join("\n");
+    await sendMessage(
+      `it's time for weekly reports!\n${text}\nwinner: ${winner.name}`
     );
-  });
+  } catch (error) {
+    console.log(error);
+  }
 }
 
 async function sendDailyScores() {
-  return new Promise((resolve, reject) => {
-    const offsetDate = Math.floor(Date.now()) - 24 * 3600 * 1000;
-    db.all(
-      `select user_id, name, sum(score) as score from records INNER JOIN users on users.ID = records.user_id where date > ${offsetDate} group by user_id`,
-      async function (err, rows) {
-        if (err) {
-          console.log("error in quering records");
-          reject();
-          return;
-        }
-        if (rows.length === 0) {
-          console.log("[daily]: no user registered");
-          resolve();
-        }
-        const text = rows
-          .map((row) => `${row.name} got ${row.score} points`)
-          .join("\n");
-        await sendMessage("what happened yesterday?\n" + text);
-        resolve();
-      }
-    );
-  });
+  try {
+    const text = data
+      .map((user) => {
+        const record = getYesterdayRecord(user.token);
+        if (!record) return undefined;
+        return `${user.name}: ${record.score}`;
+      })
+      .filter((r) => !!r)
+      .join("\n");
+    await sendMessage("what happened yesterday?\n" + text);
+  } catch (error) {
+    console.log(error);
+  }
 }
 
+// setTimeout(async () => {
+//   console.log("updating records");
+//   await updateRecords();
+//   console.log("updated records");
+//   console.log("sending daily reports");
+//   await sendDailyScores();
+//   console.log("sent daily reports");
+//   console.log("sending weekly reports");
+//   await sendWeeklyScores();
+//   console.log("sent weekly reports");
+// }, 10000);
 // hourly update
 cron.schedule("0 * * * *", async () => {
   try {
