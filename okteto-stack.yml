@@ -7,7 +7,11 @@ services:
     environment:
       - TG_TOKEN=$TG_TOKEN
       - CHAT_ID=$CHAT_ID
+    volumes:
+      - data:./data
 endpoints:
   - path: /
     service: node
     port: 8080
+volume:
+  - data

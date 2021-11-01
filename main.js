@@ -7,7 +7,7 @@ const fs = require("fs");
 const app = express();
 const port = 8080;
 
-const db = new sqlite.Database("./data.sqlite");
+const db = new sqlite.Database("./data/data.sqlite");
 
 const TG_TOKEN = process.env.TG_TOKEN;
 console.log(`telegram token: ${TG_TOKEN}`);

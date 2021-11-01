@@ -1,5 +1,4 @@
 /node_modules
-/storage/data.sqlite
 .env
 package-lock.json
 okteto.exe
